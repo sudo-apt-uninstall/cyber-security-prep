@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyber Security Prep</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#128274;</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <button id="homeLink" class="brand" type="button">Cyber Security Prep</button>
+  <nav class="topnav">
+    <button type="button" data-go="home" class="linkbtn">Tests</button>
+    <button type="button" data-go="history" class="linkbtn">History</button>
+  </nav>
+</header>
+
+<main id="main">
+
+  <!-- ─────────────── Home ─────────────── -->
+  <section id="screen-home" class="screen">
+    <div id="resumeBanner" class="banner hidden">
+      <div>
+        <strong>You have a test in progress.</strong>
+        <span id="resumeDetail" class="muted"></span>
+      </div>
+      <div class="banner-actions">
+        <button id="resumeBtn" class="btn primary" type="button">Resume</button>
+        <button id="discardBtn" class="btn quiet" type="button">Discard</button>
+      </div>
+    </div>
+
+    <h1>Choose a test</h1>
+    <p class="muted intro">Select a test, set your options, and begin. Answers stay
+      hidden until you submit.</p>
+
+    <div id="testList" class="cards"><p class="muted">Loading tests…</p></div>
+
+    <details id="optionsPanel" class="options">
+      <summary>Test options</summary>
+      <div class="options-body">
+
+        <fieldset>
+          <legend>Timer</legend>
+          <label class="radio">
+            <input type="radio" name="timerMode" value="recommended" checked>
+            <span>Recommended <em id="recHint" class="muted"></em></span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="timerMode" value="custom">
+            <span>Custom
+              <input id="customMinutes" type="number" min="1" max="600" value="60"
+                     class="minutes" aria-label="Custom minutes"> minutes</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="timerMode" value="none">
+            <span>No timer</span>
+          </label>
+          <p class="hint">When the timer runs out the test submits automatically.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Order</legend>
+          <label class="check">
+            <input type="checkbox" id="shuffleQuestions">
+            <span>Shuffle questions</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="shuffleOptions">
+            <span>Shuffle options</span>
+          </label>
+          <p class="hint">Both off by default, so the paper runs in its written order.
+            Turn them on for a retake so you recall the material rather than the position.</p>
+        </fieldset>
+
+      </div>
+    </details>
+  </section>
+
+  <!-- ─────────────── Runner ─────────────── -->
+  <section id="screen-test" class="screen hidden">
+    <div class="runner-head">
+      <div>
+        <h2 id="runTitle"></h2>
+        <p id="runSection" class="muted"></p>
+      </div>
+      <div class="runner-meta">
+        <div id="timer" class="timer hidden"><span id="timerValue">--:--</span></div>
+        <div class="count"><span id="answeredCount">0</span> / <span id="totalCount">0</span> answered</div>
+      </div>
+    </div>
+
+    <div class="progress"><div id="progressBar" class="progress-fill"></div></div>
+
+    <article class="qcard">
+      <p class="qnum"><span id="qPosition"></span><span id="flagTag" class="flagtag hidden">Flagged</span></p>
+      <div id="qStem" class="stem"></div>
+      <div id="qOptions" class="opts" role="radiogroup" aria-label="Answer options"></div>
+    </article>
+
+    <div class="runner-controls">
+      <button id="prevBtn" class="btn" type="button">Previous</button>
+      <button id="flagBtn" class="btn quiet" type="button">Flag for review</button>
+      <button id="nextBtn" class="btn" type="button">Next</button>
+      <button id="submitBtn" class="btn primary" type="button">Submit test</button>
+    </div>
+
+    <details class="navmap" open>
+      <summary>Question map</summary>
+      <div id="navGrid" class="grid"></div>
+      <p class="legend">
+        <span class="key answered"></span> answered
+        <span class="key"></span> unanswered
+        <span class="key flagged"></span> flagged
+      </p>
+    </details>
+  </section>
+
+  <!-- ─────────────── Results ─────────────── -->
+  <section id="screen-result" class="screen hidden">
+    <div id="scoreCard" class="scorecard"></div>
+    <div id="sectionBreakdown"></div>
+
+    <div class="review-head">
+      <h3>Review</h3>
+      <div class="filters" role="group" aria-label="Filter questions">
+        <button class="chip on" data-filter="all" type="button">All</button>
+        <button class="chip" data-filter="wrong" type="button">Incorrect</button>
+        <button class="chip" data-filter="right" type="button">Correct</button>
+        <button class="chip" data-filter="flagged" type="button">Flagged</button>
+        <button class="chip" data-filter="blank" type="button">Unanswered</button>
+      </div>
+    </div>
+
+    <div id="reviewList" class="review"></div>
+
+    <div class="runner-controls">
+      <button id="retakeBtn" class="btn primary" type="button">Retake this test</button>
+      <button data-go="home" class="btn" type="button">Back to tests</button>
+    </div>
+  </section>
+
+  <!-- ─────────────── History ─────────────── -->
+  <section id="screen-history" class="screen hidden">
+    <h1>History</h1>
+    <p class="muted intro">Attempts are stored in this browser only. Clearing site
+      data removes them.</p>
+    <div id="historyList"></div>
+    <button id="clearHistory" class="btn quiet" type="button">Clear history</button>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>Static site. Questions are compiled from Markdown in <code>tests/</code>.</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
