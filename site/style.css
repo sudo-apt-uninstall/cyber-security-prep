@@ -93,6 +93,9 @@ h3 { font-size: 1.1rem; margin: 0; }
 .card-desc { font-size: .9rem; color: var(--muted); margin-top: .3rem; }
 .card-facts { font-size: .82rem; color: var(--muted); margin-top: .45rem; }
 .card-facts span + span::before { content: " · "; }
+.paperlink { display: inline-block; margin-top: .5rem; font-size: .83rem; color: var(--accent); text-decoration: none; }
+.paperlink:hover { text-decoration: underline; }
+.paperlink::before { content: "↓ "; }
 
 /* ── options panel ── */
 .options {
