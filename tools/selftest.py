@@ -108,12 +108,48 @@ check("pass mark and time carried through",
       f"{data['passPercent']} {data['recommendedMinutes']}")
 
 man = json.loads((ROOT / "dist" / "data" / "manifest.json").read_text("utf-8"))
-check("manifest lists the test", len(man["tests"]) == 1 and
-      man["tests"][0]["id"] == "secplus-sy0701-1-1")
+ids = [t["id"] for t in man["tests"]]
+check("manifest lists every built test",
+      len(ids) == len(list((ROOT / "dist" / "data").glob("*.json"))) - 1,
+      f"manifest has {len(ids)}, data dir has "
+      f"{len(list((ROOT / 'dist' / 'data').glob('*.json'))) - 1}")
+check("manifest ids are unique", len(ids) == len(set(ids)), str(ids))
+check("the 60-item set is listed", "secplus-sy0701-1-1" in ids, str(ids))
+check("every manifest entry links a paper",
+      all(t.get("paper") for t in man["tests"]),
+      str([t["id"] for t in man["tests"] if not t.get("paper")]))
+check("every listed paper exists on disk",
+      all((ROOT / "dist" / t["paper"]).exists() for t in man["tests"]),
+      str([t["paper"] for t in man["tests"]
+           if not (ROOT / "dist" / t["paper"]).exists()]))
 check("site files copied into dist",
       (ROOT / "dist" / "index.html").exists() and
       (ROOT / "dist" / "app.js").exists() and
       (ROOT / "dist" / "style.css").exists())
+
+print("\n1b. every built test, not just the first")
+for entry in man["tests"]:
+    d = json.loads(
+        (ROOT / "dist" / "data" / f"{entry['id']}.json").read_text("utf-8"))
+    tag = entry["id"]
+    check(f"{tag}: manifest count matches the data file",
+          d["questionCount"] == entry["questionCount"] == len(d["questions"]),
+          f"{entry['questionCount']} vs {d['questionCount']} vs {len(d['questions'])}")
+    check(f"{tag}: every answer letter exists in its own options",
+          all(x["answer"] in [o["letter"] for o in x["options"]]
+              for x in d["questions"]),
+          str([x["n"] for x in d["questions"]
+               if x["answer"] not in [o["letter"] for o in x["options"]]]))
+    check(f"{tag}: no question is missing a stem or options",
+          all(x["stem"].strip() and len(x["options"]) >= 2 for x in d["questions"]))
+    counts = {}
+    for x in d["questions"]:
+        counts[x["answer"]] = counts.get(x["answer"], 0) + 1
+    top = max(counts.values())
+    check(f"{tag}: answer key is not lopsided "
+          f"({' '.join(f'{k}:{counts[k]}' for k in sorted(counts))})",
+          top / len(d["questions"]) <= 0.40,
+          f"{top}/{len(d['questions'])} on one letter")
 
 print("\n2. validator rejects broken input")
 scenario("answer letter not among options",
@@ -195,27 +231,32 @@ try:
     check("no answers leak above the key line",
           "**A**" not in qs and "**B**" not in qs,
           "an answer appeared in the question half")
-    man = json.loads((tmp / "dist" / "data" / "manifest.json").read_text("utf-8"))
+    man2 = json.loads((tmp / "dist" / "data" / "manifest.json").read_text("utf-8"))
     check("manifest links the paper",
-          man["tests"][0].get("paper") == "papers/t.md",
-          str(man["tests"][0].get("paper")))
+          man2["tests"][0].get("paper") == "papers/t.md",
+          str(man2["tests"][0].get("paper")))
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-real_paper = ROOT / "dist" / "papers" / "secplus-sy0701-1-1.md"
-check("real paper generated", real_paper.exists())
-if real_paper.exists():
-    text = real_paper.read_text("utf-8")
+for entry in man["tests"]:
+    p = ROOT / "dist" / entry["paper"]
+    tag = entry["id"]
+    check(f"{tag}: paper generated", p.exists())
+    if not p.exists():
+        continue
+    text = p.read_text("utf-8")
     qhalf, _, keyhalf = text.partition("# Answer key")
-    check("real paper: all 60 questions present",
-          all(f"**{i}.** " in qhalf for i in range(1, 61)))
-    check("real paper: no 'Answer:' leaks into the question half",
+    n = entry["questionCount"]
+    check(f"{tag}: all {n} questions present in the paper",
+          all(f"**{i}.** " in qhalf for i in range(1, n + 1)))
+    check(f"{tag}: no 'Answer:' leaks into the question half",
           "Answer:" not in qhalf)
-    check("real paper: no explanations leak into the question half",
-          "Explain:" not in qhalf and "Option B is the trap" not in qhalf)
-    check("real paper: key matches the compiled key",
-          all(f"**{c}**" in keyhalf for c in "ABCD") and
-          "A 15, B 15, C 15, D 15" in keyhalf)
+    check(f"{tag}: no explanation leaks into the question half",
+          "Explain:" not in qhalf)
+    check(f"{tag}: no answer letter is revealed before the key",
+          not any(m in qhalf for m in ("**A**", "**B**", "**C**", "**D**")))
+    check(f"{tag}: key half reports the answer spread",
+          "Answer spread:" in keyhalf)
 
 print()
 if failures:
