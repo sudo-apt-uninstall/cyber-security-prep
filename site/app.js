@@ -207,6 +207,15 @@
       if (best != null) facts.appendChild(el("span", null, "best " + best + "%"));
       main.appendChild(facts);
 
+      if (t.paper) {
+        var paper = el("a", "paperlink", "Printable paper and key");
+        paper.href = t.paper;
+        paper.target = "_blank";
+        paper.rel = "noopener";
+        paper.title = "Opens the full paper with the answer key at the end";
+        main.appendChild(paper);
+      }
+
       var go = el("button", "btn primary", "Start");
       go.type = "button";
       go.addEventListener("click", function () { startTest(t.id); });
