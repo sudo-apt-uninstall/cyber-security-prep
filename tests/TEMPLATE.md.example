@@ -1,0 +1,88 @@
+---
+# Required.
+# id    : becomes the data filename and must be unique across every test.
+#         Letters, digits, dot, dash and underscore only.
+# title : what shows on the test card.
+id: my-test-id
+title: My Test Title
+
+# Optional.
+# objective   : exam objective or topic line, shown under the title.
+# description : one sentence on the card.
+# source      : where the material came from (not shown on the site).
+# time        : minutes for the "Recommended" timer. Omit or 0 for no default.
+# pass        : pass mark as a percentage. Omit or 0 to score without a verdict.
+objective: CompTIA Security+ SY0-701, Objective 1.2
+description: A short sentence describing what this set covers.
+source: Chapter 4 of the course notes
+time: 30
+pass: 80
+---
+
+## Section name
+
+A level-two heading starts a new section. Sections are optional, but with two
+or more the results page shows a per-section breakdown, which is what turns a
+score into a study plan. Any prose outside a question is ignored by the build.
+
+### Q1
+The question stem goes here, on the lines directly under the heading.
+It may run across several lines, and may use **bold**, *italic* and `code`.
+
+- A. First option
+- B. Second option
+- C. Third option
+- D. Fourth option
+
+Answer: B
+Explain: Optional. Everything after "Explain:" up to the next question is kept,
+so an explanation can run to several paragraphs. Say why the right answer is
+right AND why the most tempting wrong option is wrong, because that is where
+the actual learning is. Leave the whole line out if there is nothing to add;
+the review screen then just shows the correct answer.
+
+### Q2
+Options do not have to be A to D. Two or more is enough, and the letters only
+have to be unique within the question.
+
+- A. True
+- B. False
+
+Answer: A
+
+## Another section
+
+### Q3
+The heading text after "###" is just a label shown during review, so "Q3",
+"Question 3" or "Firewalls" all work. Numbering on the site comes from the
+order questions appear in the file, not from the label.
+
+- A. Wrong
+- B. Right
+- C. Also wrong
+
+Answer: B
+Explain: Keep explanations free of lines that begin with "- A." or "Answer:",
+since the compiler reads those as structure rather than prose.
+
+---
+
+## Rules the build enforces
+
+A push fails, and nothing is published, if any of these is true:
+
+1. The `Answer:` letter is not one of that question's options. This is the
+   dangerous one: a typo here silently teaches the wrong fact.
+2. A question has fewer than two options, an empty option, or no stem.
+3. A question has no `Answer:` line, or more than one.
+4. A question lists the same option letter twice.
+5. Two tests share an `id`.
+6. The frontmatter is missing, unclosed, or has no `id` or `title`.
+7. More than 40% of the answers in a set of twelve or more questions land on
+   the same letter, or a letter is never correct across twenty or more
+   questions. Either way a candidate could score by guessing position instead
+   of knowing the material.
+
+Check your work before pushing with:
+
+    python3 tools/build.py --strict
