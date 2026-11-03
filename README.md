@@ -64,6 +64,11 @@ offers to resume. Attempt history is kept in the browser. Both live in
 `localStorage`, so they are per-browser and per-device, and clearing site data
 clears them.
 
+**Printable paper.** Every test card links a generated Markdown document holding
+the full paper followed by the answer key and explanations, for printing,
+sharing or working offline. The build writes it, so it can never drift out of
+step with what the site serves.
+
 ---
 
 ## Adding a question set
@@ -74,6 +79,26 @@ clears them.
 
 The workflow compiles, validates and republishes. The new test appears on the
 home page by itself; there is no index to update.
+
+If an AI agent is writing the questions, point it at **[AGENTS.md](AGENTS.md)**,
+which specifies the format, the rules the build enforces, and how to add to an
+existing set without rewriting it.
+
+**Large or growing sets can be split across files.** A folder containing a
+`test.md` is treated as one test, with every other `.md` file in it appended in
+filename order:
+
+```
+tests/secplus/sy0-701-1.2/
+    test.md        frontmatter, and optionally the first questions
+    part-02.md     questions only
+    part-03.md     questions only
+```
+
+Only `test.md` carries frontmatter. Sections carry across files and questions are
+numbered by final merged order. This matters when the author can only replace
+whole files rather than patch them: adding ten questions becomes a new small
+file instead of a rewrite of a large one.
 
 The format in full:
 
@@ -139,40 +164,49 @@ python3 tools/servecheck.py   # confirm every asset serves
 ## How it fits together
 
 ```
+AGENTS.md              Authoring spec, for AI agents writing question sets.
 tests/**/*.md          Question sets. The only files you normally edit.
 site/                  index.html, app.js, style.css
 tools/build.py         Markdown to JSON compiler and validator
+tools/paper.py         Renders the printable paper and answer key
 tools/selftest.py      Tests the compiler and the validator
 tools/servecheck.py    Serves dist/ and fetches every asset
 .github/workflows/     Compile, validate, publish
 dist/                  Generated. Not committed. Never edit by hand.
 ```
 
-The compiler writes `dist/data/<id>.json` for each test plus a
-`dist/data/manifest.json` listing them all, and copies `site/` alongside. The
-browser reads the manifest to build the picker and fetches one test's JSON when
-you start it.
+The compiler writes three things per test into `dist/`: `data/<id>.json` for the
+app, `papers/<id>.md` for reading and printing, and an entry in
+`data/manifest.json`. The browser reads the manifest to build the picker and
+fetches one test's JSON when you start it.
 
-Markdown is the authoring format and JSON is the delivery format because each
-is good at a different job. JSON is painful to hand-write once explanations run
-to a paragraph: quotes need escaping, comments are impossible, and a single
-stray comma breaks a whole file silently. Markdown reads cleanly both raw and
-rendered, and the workflow absorbs the conversion.
+Markdown is the authoring format and JSON is the delivery format because each is
+good at a different job, and because of how the files get written. JSON demands
+escaping inside long explanations and correct brace and comma placement across
+every question, so one slip invalidates the whole file and the parse error points
+somewhere other than the mistake. In Markdown a slip damages one question, and
+the validator names it by file and line. That matters most when a question set is
+written by an AI agent through an API that replaces whole files rather than
+patching them. See [AGENTS.md](AGENTS.md).
 
 ---
 
 ## First-time setup
 
 GitHub Pages has to be switched on once, by hand, by someone with admin rights
-on the repository. The build will otherwise run and pass, but the deploy step
-will fail.
+on the repository. Until it is, the build runs and passes but the deploy step
+fails.
 
 1. **Settings** then **Pages**
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**
-3. **Actions** then **Build and deploy** then **Run workflow**
 
-The site URL appears on the Pages settings screen and on the completed
-workflow run.
+That is all. Every later push to `main` builds and publishes automatically; there
+is no button to press. If Pages was switched on after the first push, the next
+push republishes, or you can use **Actions** then **Build and deploy** then
+**Run workflow** to publish without changing anything.
+
+The site URL appears on the Pages settings screen and on the completed workflow
+run.
 
 Note that this repository's contents, including the answer keys, are readable
 by anyone if the repository is public. That is fine for self-study material.
@@ -193,7 +227,8 @@ published from question sets that pass every check. A build fails if:
 4. A question lists the same option letter twice.
 5. Two tests share an `id`.
 6. Frontmatter is missing, unclosed, or has no `id` or `title`.
-7. The answer key is lopsided: more than 40% of answers on one letter across
+7. A part file of a split test carries frontmatter.
+8. The answer key is lopsided: more than 40% of answers on one letter across
    twelve or more questions, or a letter that is never correct across twenty
    or more. Both let a candidate score by guessing position rather than
    knowing the material, which makes the test worthless as practice.
