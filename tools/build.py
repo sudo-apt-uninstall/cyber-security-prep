@@ -7,7 +7,7 @@ Usage:
     python3 tools/build.py --strict   # build, but exit 1 on any warning
 
 Reads  : tests/**/*.md
-Writes : dist/  (site files + data/manifest.json + data/<id>.json)
+Writes : dist/  (site files + data/manifest.json + data/<id>.json + papers/<id>.md)
 
 Dependency-free on purpose: Python 3 standard library only, so the build never
 breaks because of a package update.
@@ -20,6 +20,9 @@ import shutil
 import sys
 from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import paper  # noqa: E402  (local module, sits beside this file)
 
 ROOT = Path(__file__).resolve().parent.parent
 TESTS_DIR = ROOT / "tests"
@@ -62,10 +65,13 @@ def parse_frontmatter(text, path):
     return meta, body
 
 
-def parse_questions(body, path):
-    """Walk the body, collecting '## Section' headings and '### Qn' questions."""
+def parse_questions(body, path, section=None):
+    """Walk the body, collecting '## Section' headings and '### Qn' questions.
+
+    Returns (questions, trailing_section). The trailing section is fed into the
+    next file of a split test so a section can span files.
+    """
     questions = []
-    section = None
     current = None
     mode = None  # None | stem | options | answer | explain
 
@@ -134,7 +140,7 @@ def parse_questions(body, path):
             current["explain"].append(line.rstrip())
 
     close()
-    return questions
+    return questions, section
 
 
 def finish_question(q, path):
@@ -186,7 +192,36 @@ def check_balance(questions, path, warnings):
             f"across {total} questions, so they can be eliminated on sight.")
 
 
-def build_test(path, warnings):
+def discover(tests_dir):
+    """Find every test, as (display_name, [paths]) pairs.
+
+    A test is either a single .md file, or a directory holding a `test.md`
+    (frontmatter, and optionally questions) plus any number of sibling .md
+    files that are appended in filename order. The split form exists so an
+    author can add a batch of questions as a NEW small file instead of
+    rewriting a large one, which is the failure mode when the writer can only
+    replace whole files rather than patch them.
+    """
+    groups = []
+    claimed = set()
+
+    for meta_file in sorted(tests_dir.rglob("test.md")):
+        folder = meta_file.parent
+        parts = [meta_file] + sorted(
+            p for p in folder.glob("*.md") if p != meta_file)
+        groups.append((folder, parts))
+        claimed.update(parts)
+
+    for path in sorted(tests_dir.rglob("*.md")):
+        if path not in claimed:
+            groups.append((path, [path]))
+
+    return groups
+
+
+def build_test(label, paths, warnings):
+    """Compile one test from one or more Markdown files."""
+    path = paths[0]
     text = path.read_text(encoding="utf-8")
     meta, body = parse_frontmatter(text, path)
 
@@ -199,9 +234,20 @@ def build_test(path, warnings):
             f"{path.name}: id {meta['id']!r} may only contain letters, digits, "
             f"dot, dash and underscore (it becomes a filename)")
 
-    questions = parse_questions(body, path)
+    # Parse each file on its own so an error names the right file and line.
+    questions, section = parse_questions(body, path)
+    for extra in paths[1:]:
+        extra_text = extra.read_text(encoding="utf-8")
+        if extra_text.lstrip().startswith("---"):
+            raise TestError(
+                f"{extra.name}: only test.md may carry frontmatter; the other "
+                f"files in a split test hold questions only")
+        more, section = parse_questions(extra_text, extra, section)
+        questions.extend(more)
+
     if not questions:
-        raise TestError(f"{path.name}: no questions found (each one starts with '### ')")
+        raise TestError(
+            f"{label}: no questions found (each one starts with '### ')")
 
     check_balance(questions, path, warnings)
 
@@ -255,8 +301,8 @@ def main():
         print(f"error: no tests/ directory at {TESTS_DIR}", file=sys.stderr)
         return 1
 
-    paths = sorted(TESTS_DIR.rglob("*.md"))
-    if not paths:
+    groups = discover(TESTS_DIR)
+    if not groups:
         print("error: tests/ contains no .md files", file=sys.stderr)
         return 1
 
@@ -264,18 +310,20 @@ def main():
     built = []
     seen_ids = {}
 
-    for path in paths:
+    for label, paths in groups:
+        name = label.name
         try:
-            data = build_test(path, warnings)
+            data = build_test(name, paths, warnings)
         except TestError as exc:
             print(f"FAIL  {exc}", file=sys.stderr)
             return 1
 
         if data["id"] in seen_ids:
-            print(f"FAIL  {path.name}: id {data['id']!r} is already used by "
+            print(f"FAIL  {name}: id {data['id']!r} is already used by "
                   f"{seen_ids[data['id']]}", file=sys.stderr)
             return 1
-        seen_ids[data["id"]] = path.name
+        seen_ids[data["id"]] = name
+        data["_parts"] = len(paths)
         built.append(data)
 
     if DIST_DIR.exists():
@@ -284,10 +332,19 @@ def main():
     data_dir = DIST_DIR / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    papers_dir = DIST_DIR / "papers"
+    papers_dir.mkdir(parents=True, exist_ok=True)
+
     manifest = []
     for data in built:
+        parts = data.pop("_parts", 1)
         (data_dir / f"{data['id']}.json").write_text(
             json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+        # Readable paper plus key, for printing, sharing or offline study.
+        paper_name = f"{data['id']}.md"
+        (papers_dir / paper_name).write_text(paper.render(data), encoding="utf-8")
+
         manifest.append({
             "id": data["id"],
             "title": data["title"],
@@ -297,7 +354,9 @@ def main():
             "recommendedMinutes": data["recommendedMinutes"],
             "passPercent": data["passPercent"],
             "sections": data["sections"],
+            "paper": f"papers/{paper_name}",
         })
+        data["_parts"] = parts
 
     manifest.sort(key=lambda m: (m["objective"], m["title"]))
     (data_dir / "manifest.json").write_text(
@@ -308,7 +367,10 @@ def main():
         spread = " ".join(f"{k}:{counts[k]}" for k in sorted(counts))
         missing = sum(1 for q in data["questions"] if not q["explain"])
         note = f", {missing} without explanation" if missing else ""
-        print(f"  ok  {data['id']}  {data['questionCount']} questions  [{spread}]{note}")
+        parts = data.get("_parts", 1)
+        src = f", {parts} files" if parts > 1 else ""
+        print(f"  ok  {data['id']}  {data['questionCount']} questions  "
+              f"[{spread}]{note}{src}")
 
     for w in warnings:
         print(f"WARN  {w}", file=sys.stderr)
