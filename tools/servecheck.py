@@ -27,8 +27,15 @@ port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 base = "http://127.0.0.1:%d/" % port
 
-assets = ["index.html", "app.js", "style.css",
-          "data/manifest.json", "data/secplus-sy0701-1-1.json"]
+with open(DIST / "data" / "manifest.json", encoding="utf-8") as fh:
+    listed = json.load(fh)["tests"]
+
+assets = ["index.html", "app.js", "style.css", "data/manifest.json"]
+for entry in listed:
+    assets.append("data/%s.json" % entry["id"])
+    if entry.get("paper"):
+        assets.append(entry["paper"])
+
 bad = 0
 for path in assets:
     try:
