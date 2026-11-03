@@ -67,6 +67,21 @@ since the compiler reads those as structure rather than prose.
 
 ---
 
+## Splitting a large set across files
+
+Instead of one big file, a test may be a folder containing `test.md` plus any
+number of sibling `.md` files, merged in filename order:
+
+    tests/secplus/my-test/
+        test.md        frontmatter, and optionally the first questions
+        part-02.md     questions only
+        part-03.md     questions only
+
+Only `test.md` carries frontmatter. Sections carry across files, and questions
+are numbered by final merged order. Use this when adding questions to an
+existing set, so the new ones go in a new file rather than forcing a rewrite of
+a large one.
+
 ## Rules the build enforces
 
 A push fails, and nothing is published, if any of these is true:
@@ -78,7 +93,8 @@ A push fails, and nothing is published, if any of these is true:
 4. A question lists the same option letter twice.
 5. Two tests share an `id`.
 6. The frontmatter is missing, unclosed, or has no `id` or `title`.
-7. More than 40% of the answers in a set of twelve or more questions land on
+7. A part file of a split test carries frontmatter.
+8. More than 40% of the answers in a set of twelve or more questions land on
    the same letter, or a letter is never correct across twenty or more
    questions. Either way a candidate could score by guessing position instead
    of knowing the material.
